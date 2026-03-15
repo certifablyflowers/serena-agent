@@ -1,0 +1,7 @@
+node_modules/
+logs/
+*.log
+engage-state.json
+post-log.json
+affiliate-log.json
+.env
