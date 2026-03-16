@@ -77,43 +77,51 @@ async function generateDailyContent(trendingNews = []) {
   const hook = pickRandom(theme.hooks);
   const example = pickRandom(theme.examples);
 
-  // Use Gemini to generate real content in Brooke's voice
-  const prompt = `You are Serena, the AI content agent for @BrookeThatRN — a Registered Nurse creating real health + wellness content.
+  // Use Gemini to generate real content in Brookey's voice
+  const prompt = `You are writing content for Brookey — a 28-year-old CVICU nurse and social media creator.
+
+BROOKEY'S VOICE (non-negotiable):
+- Gossip Girl narrator register — omniscient, arch, already knows how this ends
+- CVICU superiority complex — never announced, just present in the specificity
+- Dry and deadpan. Funny without performing funny.
+- Specific. Name the drip. Name the vibe. Never vague.
+- Never says "as a nurse" — she shows it, doesn't credential it
+- Never starts a sentence with "I"
+- Never uses "real talk", "nurse friend", "y'all", or any phrase that sounds like an influencer template
+- No more than 2 hashtags on X — usually zero
+- Never explains the joke. Never asks "can you relate?"
 
 TODAY'S THEME: ${theme.name}
-DESCRIPTION: ${theme.description}
-HOOK TO USE: "${hook}"
-EXAMPLE TOPIC IDEA: "${example}"
-${topNews ? `TRENDING HEALTH NEWS TODAY: "${topNews}"${topNewsSource ? ` (${topNewsSource})` : ''} — weave this in if relevant` : ''}
-${trendResearch.tiktokHealthTrends.length ? `TRENDING ON TIKTOK: ${trendResearch.tiktokHealthTrends.join(', ')} — reference if fits` : ''}
+THEME DIRECTION: ${theme.description}
+STARTING ANGLE: "${hook}"
+TOPIC SEED: "${example}"
+${topNews ? `TRENDING TODAY: "${topNews}" — work in if it earns its place` : ''}
 
-BROOKE'S VOICE:
-- Warm and real — like a nurse friend who tells the truth
-- Confident but never preachy
-- Uses humor naturally
-- Simplifies medical topics for everyday people
-- Never sounds like a robot or a press release
+GOOD BROOKEY TWEET EXAMPLES (voice reference, do not reuse):
+- "The attending said 'good catch' and walked away. That's it. That's the whole thank you."
+- "Good morning from the C-V-I-C-U. Where the monitors never stop beeping and neither do I."
+- "He was on four pressors. We didn't say it out loud. We didn't have to."
+- "Someone called CVICU basically like a regular ICU. Okay."
+- "The 3am version of yourself is a completely different nurse. She's better. She's scarier. She doesn't make small talk."
 
-CAPTION FORMULA: Hook → Value (2-4 sentences, no jargon) → Personality (one Brooke-ish line) → CTA → Hashtags
-
-Generate content for ALL FOUR platforms. Be specific and useful — not generic.
+Generate content for ALL FOUR platforms. The X tweet should feel like something Brookey actually said — not a headline.
 
 OUTPUT FORMAT (exactly):
 ===X===
-[tweet under 280 chars, 2-3 hashtags, punchy]
+[tweet under 280 chars — dry, specific, Gossip Girl register. Zero or one hashtag. Never starts with "I".]
 
 ===INSTAGRAM===
-[150-300 words, line breaks, 10 hashtags, first line is the hook]
+[150-250 words. Same voice — not a caption template. Line breaks for readability. 6-8 hashtags at the end including #CVICU #NurseLife #ICUnurse]
 
 ===TIKTOK===
-[1-2 sentence caption + 6-8 hashtags including #fyp #nursesoftiktok]
-SCRIPT HOOK: [first 2 seconds of video — what Brooke says out loud]
+[1-2 sentence caption that matches the video hook energy. 5-7 hashtags including #fyp #nursesoftiktok #CVICU]
+SCRIPT HOOK: [first 2 seconds — what Brookey says out loud to open the video]
 
 ===YOUTUBE===
-TITLE: [searchable title using "A Nurse Explains" formula]
-DESCRIPTION: [2 paragraphs + keywords]
+TITLE: [specific, searchable — not "A Nurse Explains", something Brookey would actually title it]
+DESCRIPTION: [2 paragraphs + keywords]`;
 
-Keep it real. Keep it Brooke.`;
+
 
   try {
     const response = await gemini(prompt, { temperature: 0.75, maxTokens: 1200 });
@@ -173,17 +181,16 @@ function parsePlatformContent(aiResponse, theme, hook) {
 
 // ── Fallback template content ──────────────────────────────────────────────
 function generateFallbackContent(theme, hook, example) {
-  const required = '#nurse #nurselife #healthtips #wellness #RN';
   return {
     theme: theme.name,
     hook,
-    x: `${hook}\n\n${example}\n\n#nurse #healthtips #RN`,
-    instagram: `${hook}\n\n${example}\n\nAs a nurse, here's what you actually need to know about this.\n\nSave this for later. 💉\n\n${required} #nursing #selfcare #medicaladvice`,
-    tiktok: `${hook} 💉 #nurse #nursesoftiktok #fyp #healthtips #wellness`,
+    x: `${example} #CVICU`,
+    instagram: `${example}\n\nThis is what the floor actually looks like.\n\n#CVICU #NurseLife #ICUnurse #CriticalCare #NursingTwitter #NursesOfInstagram`,
+    tiktok: `${hook} #CVICU #nursesoftiktok #fyp #ICUnurse #NurseLife`,
     tiktokHook: hook,
     youtube: {
-      title: `The Truth About ${theme.name} (A Nurse Explains)`,
-      description: `${example}\n\nAs a Registered Nurse, I'm breaking this down in plain language. No jargon, no fear — just real talk.\n\n#nurse #health #wellness`,
+      title: `${theme.name} — From the CVICU`,
+      description: `${example}\n\nCVICU nurse. 12-hour shifts. This is what it's actually like.\n\n#CVICU #NurseLife #CriticalCare`,
     },
   };
 }
