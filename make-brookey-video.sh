@@ -3,8 +3,8 @@ set -e
 source ~/.openclaw/workspace-serena/.env
 
 AVATAR_ID="f0ecdd8a5d9242109fb32b336ec809b0"
-LOOK_ID="4a5dd11ef6844b5cb87b07628a13bb6d"
 VOICE_ID="gE0owC0H9C8SzfDyIUtB"
+ICU_BG_URL="https://files.catbox.moe/te41kv.jpg"
 
 echo "Step 1: Generating voice with ElevenLabs..."
 curl -s -X POST "https://api.elevenlabs.io/v1/text-to-speech/$VOICE_ID" \
@@ -23,25 +23,31 @@ ffmpeg -i /tmp/brookey-voice.mp3 -ar 44100 -ac 1 -f wav /tmp/brookey-voice.wav -
 AUDIO_URL=$(curl -s -F "reqtype=fileupload" -F "fileToUpload=@/tmp/brookey-voice.wav" https://catbox.moe/user/api.php)
 echo "Audio URL: $AUDIO_URL"
 
-echo "Step 3: Submitting video job to HeyGen..."
+echo "Step 3: Submitting video job to HeyGen (Avatar IV motion)..."
 VIDEO_ID=$(curl -s -X POST "https://api.heygen.com/v2/video/generate" \
   -H "X-Api-Key: $HEYGEN_API_KEY" \
   -H "Content-Type: application/json" \
   -d "{
     \"video_inputs\": [{
       \"character\": {
-        \"type\": \"avatar\",
-        \"avatar_id\": \"$AVATAR_ID\",
-        \"avatar_style\": \"normal\",
-        \"look_id\": \"$LOOK_ID\"
+        \"type\": \"talking_photo\",
+        \"talking_photo_id\": \"$AVATAR_ID\",
+        \"talking_style\": \"expressive\",
+        \"matting\": true
       },
       \"voice\": {
         \"type\": \"audio\",
         \"audio_url\": \"$AUDIO_URL\"
+      },
+      \"background\": {
+        \"type\": \"image\",
+        \"url\": \"$ICU_BG_URL\"
       }
     }],
-    \"dimension\": { \"width\": 1080, \"height\": 1920 }
-  }" | python3 -c "import sys,json; print(json.load(sys.stdin)['data']['video_id'])")
+    \"dimension\": { \"width\": 1080, \"height\": 1920 },
+    \"custom_motion_prompt\": \"ICU nurse standing at bedside, glancing at cardiac monitors, adjusting IV line with right hand, looking focused and confident\",
+    \"enhance_custom_motion_prompt\": true
+  }" | python3 -c "import sys,json; d=json.load(sys.stdin); print(d['data']['video_id']) if d.get('data') else print('ERROR:', d)")
 echo "Video ID: $VIDEO_ID"
 
 echo "Step 4: Waiting for HeyGen to render (1-5 mins)..."
