@@ -2,7 +2,7 @@
 set -e
 source ~/.openclaw/workspace-serena/.env
 
-AVATAR_ID="64a78fb72ef44e0287f76ea30703ffd8"
+AVATAR_ID="f0ecdd8a5d9242109fb32b336ec809b0"
 LOOK_ID="4a5dd11ef6844b5cb87b07628a13bb6d"
 VOICE_ID="gE0owC0H9C8SzfDyIUtB"
 
