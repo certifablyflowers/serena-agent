@@ -6,7 +6,7 @@
 
 const { gemini } = require('../shared/ai');
 const { getTodaysTheme, CAPTION_FORMULA, PLATFORM_RULES, AFFILIATES, pickRandom, VOICE } = require('./brooke');
-const { getTrendingTopics, getTikTokTrends } = require('./trends');
+const { getTikTokTrends, getNursingTopics } = require('./trends');
 const { appendAffiliate, getAffiliateStatus, THEME_TO_PRODUCT } = require('./affiliates');
 const fs   = require('fs');
 const path = require('path');
@@ -34,34 +34,50 @@ function logPost(entry) {
   fs.writeFileSync(POST_LOG_FILE, JSON.stringify(trimmed, null, 2));
 }
 
-// ── Step 2: Research trending health/nursing topic ─────────────────────────
+// ── CVICU topic bank — used when no external nursing news is available ──────
+const CVICU_TOPIC_BANK = [
+  'What an IABP waveform actually tells you at 3am',
+  'The moment you realize a patient is turning — before the numbers do',
+  'Managing a post-CABG bleed when the attending is in the elevator',
+  'Four pressors and a family waiting in the hall',
+  'When the balloon pump alarm is the calmest sound in the room',
+  'Titrating vasoactives is not a protocol, it\'s a conversation with the patient',
+  'The resident who was confidently wrong and the nurse who said nothing until it mattered',
+  'Night shift CVICU: what happens between 3am and 5am when everyone is stable',
+  'How CVICU nurses know before the monitor does',
+  'The difference between a bad rhythm and a bad patient',
+];
+
+// ── Step 2: Research trending nursing/healthcare topic ─────────────────────
 async function researchTrendingHealthTopic() {
   try {
-    // Pull nursing + health news and TikTok trends in parallel
-    const [news, tiktok] = await Promise.all([
-      getTrendingTopics().catch(() => []),
+    const [nursingNews, tiktok] = await Promise.all([
+      getNursingTopics().catch(() => []),
       getTikTokTrends().catch(() => ({ trends: [] })),
     ]);
 
-    // Filter for health/nursing relevance
-    const healthKeywords = /health|nurse|nursing|medical|hospital|wellness|diet|sleep|stress|pain|heart|blood|cancer|mental|anxiety|depression|vitamin|exercise|covid|flu|drug|medication|surgery|patient|doctor|clinical/i;
+    const topNews = nursingNews[0] || null;
 
-    const relevantNews = news.filter(n => healthKeywords.test(n.title || ''));
-    const topNews = relevantNews[0] || news[0] || null;
-
-    // TikTok viral health trends
+    // TikTok health trends only
+    const NURSING_TIKTOK = /nurs|health|medical|hospital|icu|doctor|wellness|fitness|mental.health/i;
     const ttHealth = tiktok.trends?.filter(t =>
-      healthKeywords.test(t.tag || '')
+      NURSING_TIKTOK.test(t.tag || '')
     ).slice(0, 3) || [];
+
+    // If no nursing news found, pull from CVICU topic bank
+    const cvicuFallback = !topNews
+      ? CVICU_TOPIC_BANK[Math.floor(Math.random() * CVICU_TOPIC_BANK.length)]
+      : null;
 
     return {
       topNewsHeadline: topNews?.title || null,
       topNewsSource:   topNews?.source || null,
       tiktokHealthTrends: ttHealth.map(t => t.tag),
-      allNews: relevantNews.slice(0, 5),
+      cvicuFallbackTopic: cvicuFallback,
     };
   } catch {
-    return { topNewsHeadline: null, tiktokHealthTrends: [], allNews: [] };
+    const cvicuFallback = CVICU_TOPIC_BANK[Math.floor(Math.random() * CVICU_TOPIC_BANK.length)];
+    return { topNewsHeadline: null, tiktokHealthTrends: [], cvicuFallbackTopic: cvicuFallback };
   }
 }
 
@@ -73,53 +89,58 @@ async function generateDailyContent(trendingNews = []) {
   const trendResearch = await researchTrendingHealthTopic();
   const topNews = trendingNews[0]?.title || trendResearch.topNewsHeadline || null;
   const topNewsSource = trendResearch.topNewsSource || null;
+  const cvicuTopic = trendResearch.cvicuFallbackTopic || null;
 
   const hook = pickRandom(theme.hooks);
   const example = pickRandom(theme.examples);
 
   // Use Gemini to generate real content in Brookey's voice
-  const prompt = `You are writing content for Brookey — a 28-year-old CVICU nurse and social media creator.
+  const topicLine = topNews
+    ? `NURSING NEWS TODAY: "${topNews}"${topNewsSource ? ` (${topNewsSource})` : ''} — use if it earns its place`
+    : `CVICU TOPIC: "${cvicuTopic}" — write from Brookey's direct experience`;
 
-BROOKEY'S VOICE (non-negotiable):
-- Gossip Girl narrator register — omniscient, arch, already knows how this ends
-- CVICU superiority complex — never announced, just present in the specificity
-- Dry and deadpan. Funny without performing funny.
-- Specific. Name the drip. Name the vibe. Never vague.
-- Never says "as a nurse" — she shows it, doesn't credential it
-- Never starts a sentence with "I"
-- Never uses "real talk", "nurse friend", "y'all", or any phrase that sounds like an influencer template
-- No more than 2 hashtags on X — usually zero
-- Never explains the joke. Never asks "can you relate?"
+  const prompt = `You are writing content for Brookey — a 28-year-old CVICU nurse.
+
+VOICE — READ THIS CAREFULLY:
+Brookey is the Gossip Girl narrator of nursing. Omniscient, dry, arch. She already knows how the story ends. She has a quiet CVICU superiority complex — not because she announces it, but because she names the balloon pump waveform instead of saying "medical equipment." She posts one observation and leaves. No threads. No CTAs. No "follow me for more."
+
+BANNED PHRASES — if any of these appear, start over:
+- "real talk" / "real talk from a real nurse" / "real ICU nurse"
+- "as a nurse" / "as an ICU nurse"
+- "here's what nursing school doesn't teach you"
+- "follow for more" / "follow me" / "save this"
+- "nurses, you get it" / "can you relate" / "tag a nurse"
+- "y'all" / "bestie" / "girlie"
+- Any sentence starting with "I"
+- Any question at the end designed to farm engagement
+
+GOOD TWEET EXAMPLES — this is the register:
+"The attending said 'good catch' and walked away. That's it. That's the whole thank you."
+"Good morning from the C-V-I-C-U. Where the monitors never stop beeping and neither do I."
+"He was on four pressors. We didn't say it out loud. We didn't have to."
+"Someone called CVICU basically like a regular ICU. Okay."
+"Three balloon pumps, one attending, zero parking spots. Tuesday."
+"The 3am version of yourself is a completely different nurse. She's better. She's scarier."
 
 TODAY'S THEME: ${theme.name}
-THEME DIRECTION: ${theme.description}
-STARTING ANGLE: "${hook}"
-TOPIC SEED: "${example}"
-${topNews ? `TRENDING TODAY: "${topNews}" — work in if it earns its place` : ''}
-
-GOOD BROOKEY TWEET EXAMPLES (voice reference, do not reuse):
-- "The attending said 'good catch' and walked away. That's it. That's the whole thank you."
-- "Good morning from the C-V-I-C-U. Where the monitors never stop beeping and neither do I."
-- "He was on four pressors. We didn't say it out loud. We didn't have to."
-- "Someone called CVICU basically like a regular ICU. Okay."
-- "The 3am version of yourself is a completely different nurse. She's better. She's scarier. She doesn't make small talk."
-
-Generate content for ALL FOUR platforms. The X tweet should feel like something Brookey actually said — not a headline.
+ANGLE: "${hook}"
+SEED: "${example}"
+${topicLine}
 
 OUTPUT FORMAT (exactly):
 ===X===
-[tweet under 280 chars — dry, specific, Gossip Girl register. Zero or one hashtag. Never starts with "I".]
+[One dry observation, under 280 chars. Zero hashtags unless one genuinely fits. No CTA. No question. Never starts with "I".]
 
 ===INSTAGRAM===
-[150-250 words. Same voice — not a caption template. Line breaks for readability. 6-8 hashtags at the end including #CVICU #NurseLife #ICUnurse]
+[Same voice, 100-200 words. A few sentences that build on each other. No caption formula. No hook-value-CTA structure. Just Brookey talking. 5-6 hashtags at the end: #CVICU #NurseLife #ICUnurse #CriticalCare #NursingTwitter]
 
 ===TIKTOK===
-[1-2 sentence caption that matches the video hook energy. 5-7 hashtags including #fyp #nursesoftiktok #CVICU]
-SCRIPT HOOK: [first 2 seconds — what Brookey says out loud to open the video]
+[1 sentence caption. 5-6 hashtags including #fyp #nursesoftiktok #CVICU]
+SCRIPT HOOK: [first 2 seconds — what Brookey actually says to open the video, in her voice]
 
 ===YOUTUBE===
-TITLE: [specific, searchable — not "A Nurse Explains", something Brookey would actually title it]
-DESCRIPTION: [2 paragraphs + keywords]`;
+TITLE: [specific, not generic — what this video is actually about, from a CVICU nurse's POV]
+DESCRIPTION: [2 paragraphs, Brookey's voice, + relevant keywords]`;
 
 
 
@@ -200,7 +221,7 @@ function generateFallbackContent(theme, hook, example) {
 async function generateBrookeDailyBrief() {
     // Generate content ONCE — no re-generation with news to save tokens
   const [news, fullContent] = await Promise.all([
-    getTrendingTopics().catch(() => []),
+    getNursingTopics().catch(() => []),
     generateDailyContent([]).catch(() => null),
   ]);
 

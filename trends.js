@@ -214,4 +214,33 @@ async function getTikTokTrends() {
   return { trends, confidence, news: newsItems };
 }
 
-module.exports = { getTrendingTopics, getTrendingCrypto, getBTCPrice, getTikTokTrends };
+// ── Nursing & Healthcare Topic Feeds (Serena / Brookey only) ──────────────
+const NURSING_FEEDS = [
+  'https://www.medscape.com/rss/allnews.xml',
+  'https://medlineplus.gov/rss/healthnews.xml',
+  'https://www.health.harvard.edu/blog/feed',
+  'https://feeds.webmd.com/rss/rss.aspx?RSSSource=RSS_PUBLIC',
+  'https://www.nursingtimes.net/rss/',
+  'https://www.aacn.org/rss',
+];
+
+const NURSING_KEYWORDS = /nurs|icu|critical.care|cardiac|cardiol|heart|hospital|patient|clinical|medication|treatment|surgery|diagnosis|health|medical|physician|doctor|emergency|ventilat|sepsis|blood pressure|arrhythmia|intensive care|CVICU|CABG|balloon pump|IABP|pressors|drip|titrat|intubat/i;
+const EXCLUDE_KEYWORDS = /crypto|bitcoin|ethereum|stock|market|finance|invest|politic|election|celebrity|entertainment|movie|sport|nfl|nba|mlb|weather|real estate/i;
+
+async function getNursingTopics() {
+  const results = [];
+  for (const url of NURSING_FEEDS) {
+    try {
+      const feed = await parser.parseURL(url);
+      feed.items.slice(0, 5).forEach(item => {
+        const title = item.title || '';
+        if (NURSING_KEYWORDS.test(title) && !EXCLUDE_KEYWORDS.test(title)) {
+          results.push({ title, link: item.link, source: feed.title });
+        }
+      });
+    } catch {}
+  }
+  return results.slice(0, 8);
+}
+
+module.exports = { getTrendingTopics, getTrendingCrypto, getBTCPrice, getTikTokTrends, getNursingTopics };
